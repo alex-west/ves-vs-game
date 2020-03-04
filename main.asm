@@ -40,19 +40,44 @@ initGame:
 	
 .tempX = 0
 .tempColor = 1
+; Clear screen
+;	lis 0
+;	lr blit.x, a
+;	lr blit.y, a
+;	li $80
+;	lr blit.width, a
+;	li $40
+;	lr blit.height, a
+;	li %11000001
+;	lr blit.color, a
+;	dci solid
+;	pi blit	
+	dci CLEAR_SCREEN
+	pi blitGraphic
 	
+	li $20
+	lr blit.height,a
 	lis 0
-	lr blit.x, a
 	lr blit.y, a
-	li $80
-	lr blit.width, a
-	li $40
-	lr blit.height, a
-	li %11000001
-	lr blit.color, a
-	dci solid
-	pi blit	
+	li %10000001
+	lr blit.color,a
+	pi blitAttribute
+
+	li $20
+	lr blit.height,a
+	li $20
+	lr blit.y, a
+	li %00001001
+	lr blit.color,a
+	pi blitAttribute
+
 	
+; %0000 0001 ;bw
+; %0000 1001 ;gray
+; %1000 0001 ;blue
+; %1000 1001 ;green
+	
+; prep loop
 	lis 5
 	lr .tempX, a
 	lis 11
@@ -102,6 +127,11 @@ colors:
 	db %11000100
 	db %11001000
 
+;11 red
+;10 green
+;01 blue
+;00 bkg
+	
 	; Init memory
 	
 	; Menu

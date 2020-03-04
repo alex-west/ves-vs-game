@@ -10,17 +10,26 @@
 ;
 ; Blit Attribute
 ;
+; Args
+; r2 = color - fg, bg, Fill (aa--bb-F)
+; r4 = y position
+; r6 = height (and vertical counter)
 
+blitAttribute:
+	;lr a,blit.color
+	;oi BLIT_FILL
+	;lr blit.color,a
 	li $7d
 	lr blit.x, a
 	li 2
 	lr blit.width, a
-	
 	dci .BLIT_ATTR
 	jmp blit
 
 .BLIT_ATTR: db %10101010
-	
+;db %10101010
+
+
 ;--------------;
 ; Blit Graphic ;
 ;--------------;
@@ -58,7 +67,7 @@ blitGraphic:
 ; and the graphic data pointed to by DC0, onto the screen
 ; originally from cart 26, modified and annotated
 ;
-; modifies: r1-r9, DC
+; modifies: r2-r9, DC
 
 ; register reference:
 ; -------------------
@@ -120,7 +129,7 @@ blit: subroutine
 	lm
 	lr	.pxData, A ; load a graphics byte into r8
 	
-; DC += - or DC-=1
+; DC += -1 or DC-=1
 	lis BLIT_FILL
 	ns blit.color
 	bz setFill
@@ -185,5 +194,15 @@ SMILE:
 	db %10000001
 	db %00010111
 	db 0
+
+; Fill patterns
+SOLID: db %11111111
+CHECKER: db %10101010
+
+CLEAR_SCREEN:
+	db %00001100 | BLIT_FILL
+	db 0,0
+	db $7b, $40
+	dw SOLID
 
 ; EoF
