@@ -7,11 +7,11 @@
 ; Blit Code ;
 ;===========;
 
-;
-; Blit Attribute
-;
+;--------------------;
+; Blit Attribute     ;
+;--------------------;
 ; Args
-; r2 = color - fg, bg, Fill (aa--bb-F)
+; r2 = color - fg, bg, Fill (aa--bbCF)
 ; r4 = y position
 ; r6 = height (and vertical counter)
 
@@ -29,6 +29,37 @@ blitAttribute:
 .BLIT_ATTR: db %10101010
 ;db %10101010
 
+;---------------
+; BlitNum
+;---------------
+; args
+; r2 = color - fg, bg, Fill (aa--bbCF)
+; r3 = x position
+; r4 = y position
+; r5 = char
+; r6 = 
+;
+; r7 = horizontal counter
+; r8 = graphics byte
+; r9 = bit counter
+;
+; DC = pointer to graphics
+blit.num = 5
+
+blitNum:
+	; DC = NUMERALS + num*2
+	dci NUMERALS
+	lr a, blit.num
+	sl 1
+	adc
+	; set width/height
+	li 3
+	lr blit.width, a
+	li 5
+	lr blit.height, a
+	;blit()
+	jmp blit
+	
 
 ;--------------;
 ; Blit Graphic ;
@@ -71,7 +102,7 @@ blitGraphic:
 
 ; register reference:
 ; -------------------
-; r2 = color - fg, bg, Fill (aa--bb-F)
+; r2 = color - fg, bg, Fill (aa--bbCF)
 ; r3 = x position
 ; r4 = y position
 ; r5 = width
@@ -90,7 +121,8 @@ blit.y = 4
 blit.width = 5
 blit.height = 6
 
-BLIT_FILL = %00000001
+BLIT_FILL  = %00000001
+BLIT_CLEAR = %00000010
 
 blit: subroutine
 
@@ -146,12 +178,13 @@ setFill:
 	; check color to use
 	lr	A, blit.color			; load fg color
 	bc	.setColor					; if this bit is on, draw the color
-	sl 4                        ; load bg color
-	;lr	A, blit.colorA			; load color 2
+	; skip write if bg color is clear
+	ni BLIT_CLEAR
+	bnz .checkColumn
+	; load bg color
+	lr a, blit.color
+	sl 4
 .setColor:
-	; ??
-	;inc
-	;bc .checkColumn				; branch if the color is "clear"
 	com
 	ni %11000000
 	outs 1						; output A in p1 (color)
@@ -188,6 +221,7 @@ setFill:
 	pop
 	
 ; end of blit()
+;---------------------------
 
 SMILE:
 	db %01010010
@@ -198,11 +232,46 @@ SMILE:
 ; Fill patterns
 SOLID: db %11111111
 CHECKER: db %10101010
+SPARSE: db %10000000
 
 CLEAR_SCREEN:
 	db %00001100 | BLIT_FILL
 	db 0,0
 	db $7b, $40
 	dw SOLID
+	
+CHECKER_OVERLAY:
+	db %10000010 | BLIT_FILL
+	db 0,0
+	db $7b, $40
+	dw SPARSE
+
+WATER_ATTR_PX:
+	db %10011010, %01101010
+	
+water_attr:
+	db %10000000
+	db $7d, 64-10
+	db 2,8
+	dw WATER_ATTR_PX
+	
+;; Numerals 3x5 - self-made - 2 bytes each
+NUMERALS:
+	db %11110110, %11011110 ; 0
+	db %01011001, %00101110 ; 1
+	db %11000101, %01001110 ; 2
+	db %11100101, %10011110 ; 3
+	db %10110111, %10010010 ; 4
+	db %11110011, %00011100 ; 5
+	db %01110011, %11011110 ; 6
+	db %11100100, %10100100 ; 7
+	db %11110111, %11011110 ; 8
+	db %11110111, %10010010 ; 9
+	db %01010111, %11011010 ; A
+	db %11010111, %01011100 ; B
+	db %01110010, %01000110 ; C
+	db %11010110, %11011100 ; D
+	db %11110011, %01001110 ; E
+	db %11110011, %01001000 ; F
 
 ; EoF

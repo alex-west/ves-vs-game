@@ -33,80 +33,58 @@ cartEntry: jmp initGame
 	include "gfx.asm"
 
 initGame:
+
 	; Test
-;	li $C6 ; clear screen to grey
-;	lr	$3, A
-;	pi	BIOS_CLEAR_SCREEN
-	
-.tempX = 0
-.tempColor = 1
 ; Clear screen
-;	lis 0
-;	lr blit.x, a
-;	lr blit.y, a
-;	li $80
-;	lr blit.width, a
-;	li $40
-;	lr blit.height, a
-;	li %11000001
-;	lr blit.color, a
-;	dci solid
-;	pi blit	
 	dci CLEAR_SCREEN
 	pi blitGraphic
 	
-	li $20
+	li $40
 	lr blit.height,a
 	lis 0
-	lr blit.y, a
-	li %10000001
-	lr blit.color,a
-	pi blitAttribute
-
-	li $20
-	lr blit.height,a
-	li $20
 	lr blit.y, a
 	li %00001001
 	lr blit.color,a
 	pi blitAttribute
 
-	
-; %0000 0001 ;bw
-; %0000 1001 ;gray
-; %1000 0001 ;blue
-; %1000 1001 ;green
+	dci water_attr
+	pi blitGraphic
 	
 ; prep loop
+.tempX = 0
+.tempColor = 1
+
 	lis 5
 	lr .tempX, a
-	lis 11
+	lis 15
 	lr .tempColor, a
 	
 .faceLoop:
-	dci colors
-	lr a, .tempColor
-	;sl 1
-	adc
-	lm
-	lr blit.color, a
 	
 	lr a, .tempX
 	lr blit.x, a
 	li 5
 	lr blit.y, a
 	li 5
-	lr blit.width, a
-	lr blit.height, a
-	dci SMILE
-	pi blit
 	
-	li 6
+	dci colors
+	lr a, .tempColor
+	lr blit.num, a
+	adc
+	lm
+	lr blit.color, a
+	
+	pi blitNum
+	
+	li 4
 	as .tempX
 	lr .tempX, a
 
 	ds .tempColor
 	bc .faceLoop
+	
+	dci CHECKER_OVERLAY
+	pi blitGraphic
 	
 end:
 	jmp end
@@ -114,23 +92,32 @@ end:
 solid:
 	db $FF
 colors:
-	db %00000100
-	db %00001000
-	db %00001100
 	db %01000000
-	db %01001000
-	db %01001100
 	db %10000000
-	db %10000100
-	db %10001100
 	db %11000000
-	db %11000100
-	db %11001000
+	db %01000000
+	db %01000000
+	db %01000000
+	db %10000000
+	db %10000000
+	db %10000000
+	db %11000000
+	db %11000000
+	db %11000000
+	db %01000000
+	db %01000000
+	db %01000000
+	db %10000000
 
 ;11 red
 ;10 green
 ;01 blue
 ;00 bkg
+
+; %0000 0001 ;bw
+; %0000 1001 ;gray
+; %1000 0001 ;blue
+; %1000 1001 ;green
 	
 	; Init memory
 	
