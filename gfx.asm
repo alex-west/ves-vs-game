@@ -103,6 +103,7 @@ blitGraphic:
 ; register reference:
 ; -------------------
 ; r2 = color - fg, bg, Fill (aa--bbCF)
+; (Ftaa-Tbb)
 ; r3 = x position
 ; r4 = y position
 ; r5 = width
@@ -121,8 +122,11 @@ blit.y = 4
 blit.width = 5
 blit.height = 6
 
-BLIT_FILL  = %00000001
-BLIT_CLEAR = %00000010
+;BLIT_FILL  = %00000001
+;BLIT_CLEAR = %00000010
+BLIT_FILL  = %10000000
+BLIT_CLEAR = %01000000
+BLIT_CLEAR2 = %00000100
 
 blit: subroutine
 
@@ -162,7 +166,7 @@ blit: subroutine
 	lr	.pxData, A ; load a graphics byte into r8
 	
 ; DC += -1 or DC-=1
-	lis BLIT_FILL
+	li BLIT_FILL
 	ns blit.color
 	bz setFill
 	li $FF
@@ -179,12 +183,15 @@ setFill:
 	lr	A, blit.color			; load fg color
 	bc	.setColor					; if this bit is on, draw the color
 	; skip write if bg color is clear
-	ni BLIT_CLEAR
-	bnz .checkColumn
+;	ni BLIT_CLEAR
+;	bnz .checkColumn
 	; load bg color
-	lr a, blit.color
+;	lr a, blit.color
 	sl 4
 .setColor:
+	sl 1
+	bm .checkColumn
+	sl 1
 	com
 	ni %11000000
 	outs 1						; output A in p1 (color)
@@ -229,19 +236,33 @@ SMILE:
 	db %00010111
 	db 0
 
+SMILE_A:
+	db %00110100
+	db 10,10,5,5
+	dw SMILE
+	
+SMILE_B:
+	db %01000001
+	db 20,18,5,5
+	dw SMILE	
+	
 ; Fill patterns
 SOLID: db %11111111
 CHECKER: db %10101010
 SPARSE: db %10000000
 
+; color,x,y,w,h,dc
+
 CLEAR_SCREEN:
-	db %00001100 | BLIT_FILL
+	;db %00001100 | BLIT_FILL
+	db %00000011 | BLIT_FILL
 	db 0,0
 	db $7b, $40
 	dw SOLID
 	
 CHECKER_OVERLAY:
-	db %10000010 | BLIT_FILL
+	;db %10000010 | BLIT_FILL
+	db %00100100 | BLIT_FILL
 	db 0,0
 	db $7b, $40
 	dw SPARSE
@@ -250,7 +271,8 @@ WATER_ATTR_PX:
 	db %10011010, %01101010
 	
 water_attr:
-	db %10000000
+	;db %10000000
+	db %00100000
 	db $7d, 64-10
 	db 2,8
 	dw WATER_ATTR_PX

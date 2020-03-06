@@ -43,7 +43,8 @@ initGame:
 	lr blit.height,a
 	lis 0
 	lr blit.y, a
-	li %00001001
+	;li %00001001
+	li %10000010
 	lr blit.color,a
 	pi blitAttribute
 
@@ -86,28 +87,34 @@ initGame:
 	dci CHECKER_OVERLAY
 	pi blitGraphic
 	
+	dci SMILE_A
+	pi blitGraphic
+	
+	dci SMILE_B
+	pi blitGraphic
+	
 end:
 	jmp end
 
 solid:
 	db $FF
 colors:
-	db %01000000
-	db %10000000
-	db %11000000
-	db %01000000
-	db %01000000
-	db %01000000
-	db %10000000
-	db %10000000
-	db %10000000
-	db %11000000
-	db %11000000
-	db %11000000
-	db %01000000
-	db %01000000
-	db %01000000
-	db %10000000
+	db %01000000 >> 2
+	db %10000000 >> 2
+	db %11000000 >> 2
+	db %01000000 >> 2
+	db %01000000 >> 2
+	db %01000000 >> 2
+	db %10000000 >> 2
+	db %10000000 >> 2
+	db %10000000 >> 2
+	db %11000000 >> 2
+	db %11000000 >> 2
+	db %11000000 >> 2
+	db %01000000 >> 2
+	db %01000000 >> 2
+	db %01000000 >> 2
+	db %10000000 >> 2
 
 ;11 red
 ;10 green
