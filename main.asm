@@ -93,6 +93,24 @@ initGame:
 	dci SMILE_B
 	pi blitGraphic
 	
+; Flag
+	dci FLAG_BG
+	pi blitGraphic
+	dci FLAG_B
+	pi blitGraphic
+	dci FLAG_G
+	pi blitGraphic
+	dci FLAG_R
+	pi blitGraphic
+	dci FLAG_ATTR_GRAY
+	pi blitGraphic
+	dci FLAG_ATTR_BLUE
+	pi blitGraphic
+	dci FLAG_ATTR_GREEN
+	pi blitGraphic
+	dci FLAG_ATTR_BW
+	pi blitGraphic
+	
 end:
 	jmp end
 

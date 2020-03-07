@@ -295,5 +295,54 @@ NUMERALS:
 	db %11010110, %11011100 ; D
 	db %11110011, %01001110 ; E
 	db %11110011, %01001000 ; F
+	
+FLAG_BG:
+	db %00000011 | BLIT_FILL
+	db 0,0
+	db 27, $40
+	dw SOLID
+FLAG_B:
+	db %00010011 | BLIT_FILL
+	db 27,0
+	db 27, $40
+	dw SOLID
+FLAG_G:
+	db %00100011 | BLIT_FILL
+	db 27*2,0
+	db 27, $40
+	dw SOLID
+FLAG_R:
+	db %00110011 | BLIT_FILL
+	db 27*3,0
+	db 27, $40
+	dw SOLID
 
+FLAG_ATTR_GRAY:
+	db %10000010
+	db $7d, 0
+	db 2,16
+	dw CHECKER
+
+FLAG_ATTR_BLUE:
+	db %10100000
+	db $7d, 16
+	db 2,16
+	dw CHECKER
+	
+FLAG_ATTR_GREEN:
+	db %10100010
+	db $7d, 32
+	db 2,16
+	dw CHECKER
+	
+FLAG_ATTR_BW:
+	db %10000000
+	db $7d, 48
+	db 2,16
+	dw CHECKER
+	
+; %10000000 ;bw
+; %10000010 ;gray
+; %10100000 ;blue
+; %10100010 ;green
 ; EoF
