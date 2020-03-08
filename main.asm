@@ -15,39 +15,73 @@
 
 ; TODO LIST
 ; O Write draw function
+; X Water animation
+; X Delay function
 ; X Write main loop
 ; X Complete the game
 
+;-------------------------------------------------------------------------------
 	processor f8
-	
-	include "ves.h"
-	; include "macros.h"
 
 cartStart = $0800
 cartSize = ($400 * 2) - 1 ; 1 kilobyte * 2
 
-	org cartStart
-	
-header: db $55,"J"
-cartEntry: jmp initGame
+	org cartStart	
+header:
+	db $55,"J"
+cartEntry:
+	jmp initGame
+;-------------------------------------------------------------------------------
+; Includes
 
+	include "ves.h"
+	; include "macros.h"
 	include "gfx.asm"
 	include "pics.asm"
 
+;-------------------------------------------------------------------------------
+; Global register and constant definitions
+
+; Playfield bounds
+X_CENTER = 54
+LEFT_WALL = 7
+RIGHT_WALL = X_CENTER*2-LEFT_WALL-1
+CEILING = 13
+BRIDGE_Y = 46
+WATER_LEVEL = BRIDGE_Y + 11
+WAVE_LEVEL = WATER_LEVEL-1
+
+; Lives
+stockP1 = 020
+stockP2 = 021
+; bridge positions (in pixels)
+bridgeP1 = 022
+bridgeP2 = 023
+; timer
+timerMin = 024
+timerSec = 025
+
+
+waveTimer = 075
+; Storage for menu options
+optionTimer = 075  ;(MMMMSSSS)
+optionStock = 076  ;(LLLLRRRR)
+optionBridge = 077 ;(LLLLRRRR)
+
+;-------------------------------------------------------------------------------	
 initGame:
-	; Clear BIOS stack pointer
+; Clear BIOS stack pointer
 	setisar 073
 	clr
 	lr (is),a
 	
-	; Seed RNG from uninitialized ports (taken from Dodge It)
+; Seed RNG from uninitialized ports (taken from Dodge It) TODO: Implement
 	;setisar rng
 	;ins 4
 	;lr (is)-,a
 	;ins 5
 	;lr (is)+,a
 
-	; Test
 ; Clear screen
 	dci CLEAR_SCREEN
 	pi blitGraphic
@@ -60,114 +94,32 @@ initGame:
 	lr blit.color,a
 	pi blitAttribute
 
-	pi drawPlayfield
-	
-	jmp end
-;	dci water_attr
-;	pi playfield_attr
-	
-; prep loop
-.tempX = 0
-.tempColor = 1
-
-	lis 5
-	lr .tempX, a
-	lis 15
-	lr .tempColor, a
-	
-.faceLoop:
-	
-	lr a, .tempX
-	lr blit.x, a
-	li 5
-	lr blit.y, a
-	li 5
-	
-	dci colors
-	lr a, .tempColor
-	lr blit.char, a
-	adc
-	lm
-	lr blit.color, a
-	
-	pi blitNum
-	
-	li 4
-	as .tempX
-	lr .tempX, a
-
-	ds .tempColor
-	bc .faceLoop
-
-	jmp end
-	
-	dci CHECKER_OVERLAY
-	pi blitGraphic
-	
-	dci SMILE_A
-	pi blitGraphic
-	
-	dci SMILE_B
-	pi blitGraphic
-
-; Flag
-	dci FLAG_BG
-	pi blitGraphic
-	dci FLAG_B
-	pi blitGraphic
-	dci FLAG_G
-	pi blitGraphic
-	dci FLAG_R
-	pi blitGraphic
-	dci FLAG_ATTR_GRAY
-	pi blitGraphic
-	dci FLAG_ATTR_BLUE
-	pi blitGraphic
-	dci FLAG_ATTR_GREEN
-	pi blitGraphic
-	dci FLAG_ATTR_BW
-	pi blitGraphic
-	
-end:
-	jmp end
-
-solid:
-	db $FF
-colors:
-	db %01000000 >> 2
-	db %10000000 >> 2
-	db %11000000 >> 2
-	db %01000000 >> 2
-	db %01000000 >> 2
-	db %01000000 >> 2
-	db %10000000 >> 2
-	db %10000000 >> 2
-	db %10000000 >> 2
-	db %11000000 >> 2
-	db %11000000 >> 2
-	db %11000000 >> 2
-	db %01000000 >> 2
-	db %01000000 >> 2
-	db %01000000 >> 2
-	db %10000000 >> 2
-
-;11 red
-;10 green
-;01 blue
-;00 bkg
-
-; %0000 0001 ;bw
-; %0000 1001 ;gray
-; %1000 0001 ;blue
-; %1000 1001 ;green
-	
 	; Init memory
 	
 	; Menu
 
 initMatch:
 	; Set score, position, etc.
+	
+	; TODO have this be selectable in the menu
+	setisar optionBridge
+	li (13 << 4) | (11)
+	lr (is), a
+	
+	; TODO have initial time be selectable in the menu
+	setisar timerMin
+	li $08
+	lr (is)+,a
+	li $32
+	lr (is),a
+	
 	; Draw playfield
+	
+	pi drawPlayfield
+	pi drawLeftBridge
+	pi drawRightBridge
+	
+	pi drawTimer
 	
 	
 	; Main loop
@@ -210,186 +162,273 @@ mainLoop:
 	;  display TIME OUT
 	; else, continue
 	
+	; Animate water
+	pi animateWaves
+	
 	; delay loop
+	li $15
+	lr delay.count,a
+	li $00
+	pi delay
 	
 	jmp mainLoop
-; end main loop
+; end mainLoop()
 ;-------------------------------------------------------------------------------
 
-; drawPlayfield
+;-------------------------------------------------------------------------------
+; drawPlayfield(void)
+;
+; This function could be genericized by having .tempCount be an argument and
+;  by storing playfield list in H as an arg as well
+
 drawPlayfield: subroutine
 	lr k,p
-	; Draw attributes
-	dci playfield_attr
-	pi blitGraphic
-	; Draw score bgs
-	dci score_left
-	pi blitGraphic
-	dci score_right
-	pi blitGraphic
-	dci score_line
-	pi blitGraphic
-	; Draw goal lines
-	dci goal_left
-	pi blitGraphic
-	dci goal_right
-	pi blitGraphic
-	
-	; Draw pylon
-	dci pylon_b
-	pi blitGraphic
-	
-	; Draw water
-	dci water
-	pi blitGraphic
-	
-	
-	
-; Draw left bridge (TODO: Make self-contained function)
-.BRIDGE_Y = 46
-.BRIDGE_LEN = 13
+
 .tempCount = 0
 
+	li playfield_list_len
+	lr .tempCount, a
+.drawLoop:
+	; DC = playfield_list[num*2]
+	dci playfield_list
+	lr a, .tempCount
+	sl 1
+	adc
+	lm
+	lr Qu, a
+	lm
+	lr Ql, a
+	lr dc, Q
+	
+	pi blitGraphic
+	
+	ds .tempCount
+	bc .drawLoop
+	
+	lr p,k
+	pop
+; end of drawPlayfield()
+;-------------------------------------------------------------------------------
+	
+;-------------------------------------------------------------------------------	
+; Draw left bridge
+
+drawLeftBridge: subroutine
+	lr k,p
+	
+.tempCount = 0
+	
+	; Get left bridge length
+	setisar optionBridge
+	lr a,(is)
+	sr 4
+	lr .tempCount, a
+
+	; set color, set x
 	li RED_A | CLEAR_BG
 	lr blit.color, a
-	li .scrn_center-5
+	li X_CENTER-5
 	lr blit.x,a
-	; Get left bridge length (TODO: Make variable)
-	li .BRIDGE_LEN
-	lr .tempCount, a
-.leftBridgeLoop:
+	
+.loop:
+	; reset char, reset y
 	li CHR_BRIDGE_L
 	lr blit.char, a
-	li .BRIDGE_Y
+	li BRIDGE_Y
 	lr blit.y,a
+	
 	pi blitNum
 	
+	; adjust x
 	lr a, blit.x 
 	ai <[-3]
 	lr blit.x,a
 	
 	ds .tempCount
-	bnz .leftBridgeLoop
+	bnz .loop
 
-; Draw right bridge (TODO: Make self-contained function)
+	lr p,k
+	pop
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+; Draw right bridge
+
+drawRightBridge: subroutine
+	lr k,p
+
+.tempCount = 0
+
+	; Get right bridge length
+	setisar optionBridge
+	lr a,(is)
+	ni %00001111
+	lr .tempCount, a
+
+	; set color, set x
 	li BLUE_A | CLEAR_BG
 	lr blit.color, a
-	li .scrn_center+2
+	li X_CENTER+2
 	lr blit.x,a
-	; Get right bridge length (TODO: Make variable)
-	li .BRIDGE_LEN
-	lr .tempCount, a
-.rightBridgeLoop:
+.loop:
+	; reset char, reset y
 	li CHR_BRIDGE_R
 	lr blit.char, a
-	li .BRIDGE_Y
+	li BRIDGE_Y
 	lr blit.y,a
 	pi blitNum
 	
+	; adjust x
 	lr a, blit.x 
 	ai 3
 	lr blit.x,a
 	
 	ds .tempCount
-	bnz .rightBridgeLoop
-	
-;blit.x
-;blit.y
-;blit.char = 5
-	
+	bnz .loop
 	
 	lr p,k
 	pop
-
 ; end of drawPlayfield()
-;-----
+;-------------------------------------------------------------------------------
 
-;BG_MONO  = %10000000 ;00 mono
-;BG_GRAY  = %10000010 ;01 gray
-;BG_BLUE  = %10100000 ;10 blue
-;BG_GREEN = %10100010 ;11 green
+;-------------------------------------------------------------------------------
+; drawTimer()
 
+drawTimer: subroutine
+	lr k,p
+	
+.TIMER_Y = CEILING-8
+.tempCount = 0
+
+	; set color
+	li GREEN_A | BKG_B
+	lr blit.color, a
+	; set initial x
+	li X_CENTER+6
+	lr blit.x,a
+	; prep for loop
+	lis 1
+	lr .tempCount, a
+	
+	setisar timerSec
+	
+.loop:
+; Draw ones
+	lr a,(is)
+	ni $0F
+	lr blit.char, a
+	; Set y
+	li .TIMER_Y
+	lr blit.y, a
+	pi blitNum
+	; adjust x
+	lr a, blit.x
+	ai <[-4]
+	lr blit.x, a
+	
+; Draw tens
+	; get color
+	lr a,(is)- ; adjust isar to point to minutes
+	ni $F0
+	sr 4
+	lr blit.char, a
+	; Reset y
+	li .TIMER_Y
+	lr blit.y, a
+	pi blitNum
+	; adjust x
+	lr a, blit.x
+	ai <[-7]
+	lr blit.x, a
+
+	ds .tempCount
+	bc .loop
+	
+	lr p,k
+	pop
+; end of drawTimer()
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+; data for drawPlayfield()
+
+; Lists of objects to draw
+playfield_list_len = 9
+playfield_list:
+	dw playfield_attr
+	dw colon
+	dw score_left
+	dw score_right
+	dw score_line
+	dw goal_left
+	dw goal_right
+	dw pylon
+	dw water
+
+; Attributes to draw
 playfield_attr:
 	db %00100000
 	db $7d,0
 	db 2,64
 	dw PLAYFIELD_ATTR_PX
-PLAYFIELD_ATTR_PX:
-	db %11111111, %11010101, %01011100
-	db %00111101, %11010111
-	db %01010101, %01010101, %01010101, %01010101, %01010101, %01010101
-	db %01011111, %11011001
-	db %10100110, %10101010, %10101010
+PLAYFIELD_ATTR_PX: ; 00 mono, 01 gray, 10 blue, 11 green
+	db %11111111, %11010101, %01011100, %00111101
+	db %11010111, %01010101, %01010101, %01010101
+	db %01010101, %01010101, %01010101, %01011111
+	db %11011001, %10100110, %10101010, %10101010
 
-.scrn_center = 54
+; Timer colon
+COLON_PX:
+	db %11001100
+colon:
+	db GREEN_A
+	db X_CENTER-1,CEILING-7
+	db 2,3
+	dw COLON_PX
 	
 score_left:
 	db RED_A|FILL
 	db 0,0
-	db .scrn_center-11,11
+	db X_CENTER-11,11
 	dw SOLID
 
 score_right:
 	db BLUE_A|FILL
-	db .scrn_center+11,0
-	db .scrn_center-11-(2),11
+	db X_CENTER+11,0
+	db X_CENTER-11-(2),11
 	dw SOLID
 	
 score_line:
 	db RED_A|FILL
-	db 0,11
+	db 0,CEILING-2
 	db $7c,1
 	dw SOLID
 	
 goal_left:
 	db RED_A | CLEAR_BG | FILL
-	db .scrn_center-.scrn_center+7,11+2
-	db 1,44
+	db LEFT_WALL,CEILING
+	db 1,WATER_LEVEL-CEILING
 	dw CHECKER
 	
 goal_right:
 	db BLUE_A | CLEAR_BG | FILL
-	db .scrn_center+.scrn_center-8,11+2
-	db 1,44
+	db RIGHT_WALL,CEILING
+	db 1,WATER_LEVEL-CEILING
 	dw CHECKER
-
-PYLON_PX:
-	db %11111111
-	db %11111111
-	db %11111111
-	db %11111111
-	db %11111111
-	db %01111111
-	db %10001111
-	db %11000011
-	db %11110000
-	db %11111100
-	db %00011110
-	db %00000111
-	db %10000001
-	db %11100000
-	db %00110000
-	db %00001100
-	db %00000011
-	db %00000000
 	
 pylon:
-	db GREEN_A | BKG_B
-	db .scrn_center-5,.BRIDGE_Y
-	db 10,14
-	dw PYLON_PX
-	
-pylon_b:
 	db GREEN_A | FILL
-	db .scrn_center-3,.BRIDGE_Y
+	db X_CENTER-3,BRIDGE_Y
 	db 6,10
 	dw SOLID
 	
 water:
 	db BLUE_A|FILL
-	db 0,.BRIDGE_Y+11
+	db 0,WATER_LEVEL
 	db $7c,8
 	dw SOLID
+; end of data for drawPlayfield()
+;-------------------------------------------------------------------------------
 	
 ;-------------------------------------------------------------------------------
 ;redraw
@@ -409,7 +448,118 @@ water:
 	
 	; CPU_counter should increase by 1 for ever plotted pixel, maybe other things
 	
+; args
+; A - lower part of delay
+delay.count = 0
+
+delay: subroutine
+
+.loop:
+	inc
+	bnz .loop
 	
+	ds delay.count
+	lis 0
+	bnz .loop
+	
+	pop
+; end of delay()
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+; animateWaves()
+;
+; animates some nices waves
+;
+;0__________12         36____________48
+
+;WAVE_LEVEL
+;waveTimer
+
+WAVE_LEN = 20
+WAVE_GAP = 12
+WAVE_SPEED = 1
+NUM_WAVES = 4
+
+animateWaves: subroutine
+	lr k,p
+
+.loopCount = 0
+.tempX = 1
+
+	lis NUM_WAVES
+	lr .loopCount, a
+	
+	dci SOLID
+	lis 1
+	lr blit.width, a
+	
+	setisar waveTimer
+	lr a, (IS)
+	lr .tempX, a
+
+.loop:
+; undraw
+	; set color, y, and h
+	li BKG_A | FILL
+	lr blit.color, a
+	li WAVE_LEVEL
+	lr blit.y, a
+	lis 1
+	lr blit.height, a
+	
+	lr a,.tempX
+	ni $7f
+	ci $7c
+	bnc .next1
+	lr blit.x, a
+	
+	pi blit
+	
+.next1: ;adjust .tempX
+	lr a, .tempX
+	ai WAVE_LEN
+	lr .tempX, a
+	
+; draw
+	; set color, y, and h
+	li BLUE_A | FILL
+	lr blit.color, a
+	li WAVE_LEVEL
+	lr blit.y, a
+	lis 1
+	lr blit.height, a
+
+	lr a,.tempX
+	ni $7f
+	ci $7c
+	bnc .next2
+	lr blit.x, a
+
+	pi blit
+	
+.next2: ;adjust .tempX
+	lr a, .tempX
+	ai WAVE_GAP
+	lr .tempX, a
+	
+	ds .loopCount
+	bnz .loop
+	
+	; inc waveTimer
+	setisar waveTimer
+	lis WAVE_SPEED
+	as (IS)
+	lr (IS), a
+	
+	
+	lr p,k
+	pop
+; end of animateWaves()
+;-------------------------------------------------------------------------------
+
 	org cartStart + cartSize - 24
+	
 	dc "Copyright 2020 Alex West", 0
+	
 ; EoF
