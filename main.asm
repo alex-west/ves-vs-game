@@ -15,7 +15,10 @@
 
 ; TODO LIST
 ; O Write draw function
-; X Water animation
+; O Water animation
+; X Menu (Change time, stock, bridge lengths, etc)
+; X Timer Decrement
+; X Draw Stock (inc/dec)
 ; X Delay function
 ; X Write main loop
 ; X Complete the game
@@ -166,7 +169,7 @@ mainLoop:
 	pi animateWaves
 	
 	; delay loop
-	li $15
+	li $10
 	lr delay.count,a
 	li $00
 	pi delay
@@ -429,7 +432,41 @@ water:
 	dw SOLID
 ; end of data for drawPlayfield()
 ;-------------------------------------------------------------------------------
-	
+
+;-------------------------------------------------------------------------------
+; doPlayer()
+;
+; Rough draft. Trying to figure out how to do this
+
+doPlayer:
+
+; process player
+;  if human, check inputs
+;  if computer, produce AI inputs (how?)
+;
+;  react to inputs
+;   move left or right
+;   jump (double jump) - make sure this input is edge sensitive
+;   shooting
+;    check if bullet can be spawned
+;    check angle
+;    spawn bullet
+;  undraw/draw player
+;  if fallen in water, set P1 lose flag
+
+	; Collision detection
+	;  if newpos is inside the bridge, eject up
+	;  if newpos is under the left bridge, eject left
+	;  if newpos is under the right bridge, eject right
+	;  if newpos is on the other side of the court
+	;   and if the mode does not permit crossing that line, eject back into court
+	;  if newpos in above the ceiling, eject down
+	;  if newpos is left of the left goal, eject left
+	;  if newpos is right of the right goal, eject right
+	;  if newpos is in the water, let checkDeath handle it
+
+;-------------------------------------------------------------------------------
+
 ;-------------------------------------------------------------------------------
 ;redraw
 	; object processing functions should return new x, new y, and new char
@@ -476,8 +513,8 @@ delay: subroutine
 ;WAVE_LEVEL
 ;waveTimer
 
-WAVE_LEN = 20
-WAVE_GAP = 12
+WAVE_LEN = 16
+WAVE_GAP = 16
 WAVE_SPEED = 1
 NUM_WAVES = 4
 
@@ -486,7 +523,7 @@ animateWaves: subroutine
 
 .loopCount = 0
 .tempX = 1
-
+	
 	lis NUM_WAVES
 	lr .loopCount, a
 	
@@ -497,6 +534,8 @@ animateWaves: subroutine
 	setisar waveTimer
 	lr a, (IS)
 	lr .tempX, a
+	
+	;br .part2
 
 .loop:
 ; undraw
@@ -546,10 +585,75 @@ animateWaves: subroutine
 	ds .loopCount
 	bnz .loop
 	
+; Do the opposite direction
+.part2:
+	lis NUM_WAVES
+	lr .loopCount, a
+	; reload timer
+	setisar waveTimer
+	lr a, (IS)
+	com
+	lr .tempX, a
+
+.loop2:
+; undraw
+	; set color, y, and h
+	li BKG_A | FILL
+	lr blit.color, a
+	li WAVE_LEVEL
+	lr blit.y, a
+	lis 1
+	lr blit.height, a
+	
+	lr a,.tempX
+	ni $7f
+	ci $7c
+	bnc .next3
+	lr blit.x, a
+	
+	pi blit
+	
+.next3: ;adjust .tempX
+	lr a, .tempX
+	ai <[-WAVE_LEN]
+	lr .tempX, a
+	
+; undraw
+	; set color, y, and h
+	li BLUE_A | FILL
+	lr blit.color, a
+	li WAVE_LEVEL
+	lr blit.y, a
+	lis 1
+	lr blit.height, a
+
+	lr a,.tempX
+	ni $7f
+	ci $7c
+	bnc .next4
+	lr blit.x, a
+
+	pi blit
+	
+.next4: ;adjust .tempX
+	lr a, .tempX
+	ai <[-WAVE_GAP]
+	lr .tempX, a
+	
+	ds .loopCount
+	bnz .loop2
+	
+.temp = 0
 	; inc waveTimer
 	setisar waveTimer
 	lis WAVE_SPEED
 	as (IS)
+	lr .temp, a
+	ni $7
+	lr a, .temp
+	bnz .setTimer
+	ai 4
+.setTimer:	
 	lr (IS), a
 	
 	

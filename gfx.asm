@@ -126,7 +126,7 @@ setFill:
 
 ; Loop 6 times
 .delay:
-	ai $60
+	ai $60 ; ai $03 to make it slow
 	bnz .delay
 
 .checkColumn:
@@ -179,18 +179,6 @@ blitAttribute: subroutine
 ; blitNum(color,x,y,char)
 ;
 ; Alternate entry point for blit() to make drawing numbers easier.
-
-; r2 = color - fg, bg, Fill (Ftaa-Tbb)
-; r3 = x position
-; r4 = y position
-; r5 = char
-; r6 = 
-;
-; r7 = horizontal counter
-; r8 = graphics byte
-; r9 = bit counter
-;
-; DC = pointer to graphics
 
 ; == Args
 ;blit.color
