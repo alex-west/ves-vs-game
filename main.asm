@@ -38,6 +38,7 @@ cartEntry:
 ; Includes
 
 	include "ves.h"
+	include "utils.h"
 	; include "macros.h"
 	include "gfx.asm"
 	include "pics.asm"
@@ -54,22 +55,42 @@ BRIDGE_Y = 46
 WATER_LEVEL = BRIDGE_Y + 11
 WAVE_LEVEL = WATER_LEVEL-1
 
-; Lives
-stockP1 = 020
-stockP2 = 021
-; bridge positions (in pixels)
-bridgeP1 = 022
-bridgeP2 = 023
-; timer
-timerMin = 024
-timerSec = 025
+; Player 1
+p1.xpos = 020 ; Q 7.1 (SR 1 before drawing)
+p1.ypos = 021 ; Q 7.1
+p1.xvel = 022 ; Q 3.5 (SR 4 and sign extend before adding to position)
+p1.yvel = 023 ; Q 3.5
+p1.char = 024 ; 
+p1.stoc = 025
+p1.brig = 026
+p1.prev = 027
 
+; Player 2
+p2.xpos = 030 ; Q 7.1 (SR 1 before drawing)
+p2.ypos = 031 ; Q 7.1
+p2.xvel = 032 ; Q 3.5 (SR 4 and sign extend before adding to position)
+p2.yvel = 033 ; Q 3.5
+p2.char = 034 ; 
+p2.stoc = 035
+p2.brig = 036
+p2.prev = 037
 
-waveTimer = 075
+; Timers
+timerMin = 064
+timerSec = 065
+timerFrame = 066
+waveTimer = 067
+
 ; Storage for menu options
+optionFlags = 074
 optionTimer = 075  ;(MMMMSSSS)
 optionStock = 076  ;(LLLLRRRR)
 optionBridge = 077 ;(LLLLRRRR)
+
+; Mode ideas (TODO)
+; - cross center or not
+; - bullets can respawn like contra's laser
+; - speed
 
 ;-------------------------------------------------------------------------------	
 initGame:
@@ -103,6 +124,18 @@ initGame:
 
 initMatch:
 	; Set score, position, etc.
+
+	; TODO: Replace
+	setisar p1.xpos
+	li $40
+	lr (is)+, a
+	lr (is),a
+	
+	setisar p2.xpos
+	li X_CENTER*2 + $20
+	lr (is)+, a
+	li $40
+	lr (is),a
 	
 	; TODO have this be selectable in the menu
 	setisar optionBridge
@@ -137,6 +170,8 @@ mainLoop:
 	;   if so, shorten the plank
 	
 	; process left player
+	setisaru p1.xpos
+	pi doPlayer
 	;  if human, check inputs
 	;  if computer, produce AI inputs (how?)
 	;  react to inputs
@@ -150,6 +185,8 @@ mainLoop:
 	;  if fallen in water, set P1 lose flag
 	
 	; process right player	
+	setisaru p2.xpos
+	pi doPlayer
 	;  same as above
 	
 	; if p1 & p2 both lost
@@ -439,7 +476,8 @@ water:
 ; Rough draft. Trying to figure out how to do this
 
 doPlayer:
-
+	lr k,p
+	
 ; process player
 ;  if human, check inputs
 ;  if computer, produce AI inputs (how?)
@@ -454,6 +492,7 @@ doPlayer:
 ;  undraw/draw player
 ;  if fallen in water, set P1 lose flag
 
+
 	; Collision detection
 	;  if newpos is inside the bridge, eject up
 	;  if newpos is under the left bridge, eject left
@@ -464,7 +503,53 @@ doPlayer:
 	;  if newpos is left of the left goal, eject left
 	;  if newpos is right of the right goal, eject right
 	;  if newpos is in the water, let checkDeath handle it
-
+	
+; Undraw from oldpos
+	li BKG_A
+	lr blit.color,a 
+	
+	setisarl p1.xpos
+	lr a, (is)+
+	sr 1
+	lr blit.x, a
+	
+	lr a, (is)
+	sr 1
+	lr blit.y, a
+	
+	setisarl p1.char
+	lr a, (is)
+	;ni $0F
+	lr blit.char, a
+	
+	pi blitNum
+	
+; Apply velocity	
+	
+; Redraw at newpos
+	; Get new position
+	li RED_A
+	lr blit.color,a 
+	
+	setisarl p1.xpos
+	lr a, (is)+
+	sr 1
+	lr blit.x, a
+	
+	lr a, (is)
+	sr 1
+	lr blit.y, a
+	
+	setisarl p1.char
+	lr a, (is)
+	;ni $0F
+	lr blit.char, a
+	
+	pi blitNum
+	
+	lr p,k
+	pop
+; end doPlayer()
 ;-------------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
@@ -592,7 +677,7 @@ animateWaves: subroutine
 	; reload timer
 	setisar waveTimer
 	lr a, (IS)
-	com
+	sl 1
 	lr .tempX, a
 
 .loop2:
@@ -615,7 +700,7 @@ animateWaves: subroutine
 	
 .next3: ;adjust .tempX
 	lr a, .tempX
-	ai <[-WAVE_LEN]
+	ai <[WAVE_LEN]
 	lr .tempX, a
 	
 ; undraw
@@ -637,7 +722,7 @@ animateWaves: subroutine
 	
 .next4: ;adjust .tempX
 	lr a, .tempX
-	ai <[-WAVE_GAP]
+	ai <[WAVE_GAP]
 	lr .tempX, a
 	
 	ds .loopCount
