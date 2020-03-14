@@ -63,7 +63,7 @@ p1.xvel = 022 ; Q 3.5 (SR 4 and sign extend before adding to position)
 p1.yvel = 023 ; Q 3.5
 p1.char = 024 ; 
 p1.stoc = 025
-p1.brig = 026
+p1.brig = 026 ; Q 7.1
 p1.prev = 027
 
 ; Player 2
@@ -73,7 +73,7 @@ p2.xvel = 032 ; Q 3.5 (SR 4 and sign extend before adding to position)
 p2.yvel = 033 ; Q 3.5
 p2.char = 034 ; 
 p2.stoc = 035
-p2.brig = 036
+p2.brig = 036 ; Q 7.1
 p2.prev = 037
 
 ; Timers
@@ -267,6 +267,7 @@ drawLeftBridge: subroutine
 	lr k,p
 	
 .tempCount = 0
+.tempPx = 1
 	
 	; Get left bridge length
 	setisar optionBridge
@@ -279,6 +280,10 @@ drawLeftBridge: subroutine
 	lr blit.color, a
 	li X_CENTER-5
 	lr blit.x,a
+	
+	; set tempPx (Q 7.1)
+	li X_CENTER*2-4
+	lr .tempPx, a
 	
 .loop:
 	; reset char, reset y
@@ -294,9 +299,18 @@ drawLeftBridge: subroutine
 	ai <[-3]
 	lr blit.x,a
 	
+	; adjust .tempPx
+	lr a, .tempPx
+	ai <[-6]
+	lr .tempPx, a
+	
 	ds .tempCount
 	bnz .loop
-
+	
+	setisar p1.brig
+	lr a, .tempPx
+	lr (is), a
+	
 	lr p,k
 	pop
 ;-------------------------------------------------------------------------------
@@ -308,6 +322,7 @@ drawRightBridge: subroutine
 	lr k,p
 
 .tempCount = 0
+.tempPx = 1
 
 	; Get right bridge length
 	setisar optionBridge
@@ -320,6 +335,11 @@ drawRightBridge: subroutine
 	lr blit.color, a
 	li X_CENTER+2
 	lr blit.x,a
+	
+	; set tempPx (Q 7.1)
+	li X_CENTER*2 + 2
+	lr .tempPx, a
+	
 .loop:
 	; reset char, reset y
 	li CHR_BRIDGE_R
@@ -333,8 +353,17 @@ drawRightBridge: subroutine
 	ai 3
 	lr blit.x,a
 	
+	; adjust .tempPx
+	lr a, .tempPx
+	ai 6
+	lr .tempPx, a
+	
 	ds .tempCount
 	bnz .loop
+	
+	setisar p2.brig
+	lr a, .tempPx
+	lr (is), a
 	
 	lr p,k
 	pop
@@ -569,18 +598,12 @@ doPlayer: subroutine
 	; .ytemp = ypos + yvel
 	
 	; Collision detection (ejection)
-	;  if newpos is inside the bridge, eject up and clear yvel
-	;  if newpos is under the left bridge, eject left
-	;  if newpos is under the right bridge, eject right
-	;  if newpos is on the other side of the court
-	;   and if the mode does not permit crossing that line, eject back into court
-	;  if newpos in above the ceiling, eject down
-	;  if newpos is left of the left goal, eject left
-	;  if newpos is right of the right goal, eject right
-	;  if newpos is in the water, let checkDeath handle it
-	;
-	; ^-- perhaps put that stuff in its own function with x,y,w,h args and
-	;  returns for x,y,and water collisions (so it can be reused for bullets)
+	lis 6
+	lr collision.width, a
+	li 10
+	lr collision.height, a
+	pi collision	
+	; TODO: Use collision's return flags to set velocity and handle death
 	
 	; adjust angle
 	;  if .cur & HAND_CCW
@@ -606,7 +629,7 @@ doPlayer: subroutine
 	sr 1
 	lr blit.y, a
 	
-	; Get old character??? (or just clear of block?)
+	; Get old character??? (or just aclear block?)
 	setisarl p1.char
 	lr a, (is)
 	;ni $0F
@@ -627,10 +650,10 @@ doPlayer: subroutine
 	ni 070
 	ci 020
 	bnz .p2color
-	li RED_A
+	li RED_A | CLEAR_BG
 	br .setColor
 .p2color:
-	li BLUE_A
+	li BLUE_A | CLEAR_BG
 .setColor:
 	lr blit.color,a 
 	
@@ -654,6 +677,206 @@ doPlayer: subroutine
 	lr p,k
 	pop
 ; end doPlayer()
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+; collision()
+;  Given x and y positions (in r0 and r1) and width and height (in r4 and r5)
+;   ejects the player back into the playfield.
+;
+; TODO: Set return flags (xbonk, ybonk, ground, death)
+
+collision: subroutine
+
+; == args
+collision.x = 0
+collision.y = 1
+collision.width = 4
+collision.height = 5
+; Abbreviated versions
+.x = collision.x
+.y = collision.y
+.width = collision.width
+.height = collision.height
+
+; Returns
+collision.flags = 6
+
+; Temps
+.tempIS = 7
+.tempLBridge = 8
+.tempRBridge = 9
+
+; Constants
+.BRIDGE_Y = BRIDGE_Y*2
+.X_CENTER = X_CENTER*2
+
+.LEFT_WALL = LEFT_WALL*2 + 2
+.RIGHT_WALL = RIGHT_WALL*2
+.CEILING = CEILING*2
+.WATER_LEVEL = WATER_LEVEL*2
+
+	; Save ISAR
+	lr a, is
+	lr .tempIS, a
+	; Load bridge temps
+	setisar p1.brig
+	lr a, (is)
+	lr .tempLBridge, a
+	setisaru p2.brig
+	lr a, (is)
+	lr .tempRBridge, a
+
+	; Collision detection (ejection)
+; Bridge collision
+	;  if newpos is inside the bridge, eject up set ybonk flag
+	;  if newpos is under the left bridge, eject left and set xbonk flag
+	;  if newpos is under the right bridge, eject right and set xbonk flag
+	
+	;  if newpos is in the water, set death flag
+	; .BRIDGE_Y - (.y+.height)
+	lr a, .y
+	as .height
+	ci .BRIDGE_Y
+	; if(.BRIDGE_Y > (.y+.height)) we're not in the bridge
+	bc .testLeft
+	; if this is true we should be in vertical range of the bridge
+	ci .BRIDGE_Y+6
+	bc .testBridge
+	; else, we are below the bridge
+	
+	;br .testLeft ; TODO: replace with better stuff
+	
+	; .tempLBridge - (.x+.width)
+	lr a, .x
+	as .width
+	com
+	inc
+	as .tempLBridge	
+	; if(.tempLBridge > (.x+.width)) don't eject
+	bc .testLeft
+	
+	; .tempRBridge - .x
+	lr a, .x
+	com
+	inc
+	as .tempRBridge
+	; if(.tempRBridge >= .x), don't eject
+	bnc .testLeft
+	
+	; We are underneath the bridge
+	
+	; .X_CENTER - .x
+	lr a, .x
+	ci .X_CENTER
+	; if(.X_CENTER >= .x), eject to the right
+	bnc .ejectL	
+	
+	; else eject to the left
+	lr a, .width
+	com
+	inc
+	as .tempLBridge
+	lr .x, a
+	br .testLeft
+	
+.ejectL:
+	lr a, .tempRBridge
+	inc
+	inc
+	lr .x, a
+	br .testLeft
+	
+; test if we are in the bridge on the x axis
+.testBridge:
+	
+	; .tempLBridge - (.x+.width)
+	lr a, .x
+	as .width
+	com
+	inc
+	as .tempLBridge	
+	; if(.tempLBridge > (.x+.width)) don't eject
+	bc .testLeft
+	
+	; .tempRBridge - .x
+	lr a, .x
+	com
+	inc
+	as .tempRBridge
+	; if(.tempRBridge >= .x), don't eject
+	bnc .testLeft
+
+	; We should be inside the bridge, so eject up and set ybonk and ground flags
+	lr a, .height
+	com
+	inc
+	ai .BRIDGE_Y
+	lr .y, a
+	
+; Bounds collision	
+	
+	;  if newpos is on the other side of the court
+	;   and if the mode does not permit crossing that line, eject back into court
+
+;  if newpos is left of the left goal, clamp to left goal, set xbonk flag
+.testLeft:
+	; .LEFT_WALL - .x
+	lr a, .x
+	ci .LEFT_WALL
+	; if(.LEFT_WALL >= .x), don't eject
+	bnc .testRight
+	; eject
+	li .LEFT_WALL
+	lr .x, a
+	
+	;  if newpos is right of the right goal, clamp to right goal, set xbonk flag
+.testRight:
+	; .RIGHT_WALL - (.x+.width)
+	lr a, .x
+	as .width
+	ci .RIGHT_WALL
+	; if(.RIGHT_WALL > (.x+.width)) don't eject
+	bc .testCeiling
+	; eject
+	lr a, .width
+	com
+	inc
+	ai .RIGHT_WALL
+	lr .x, a
+	
+	;  if newpos in above the ceiling, clamp to ceiling, set ybonk flag
+.testCeiling:
+	; .CEILING - .x
+	lr a, .y
+	ci .CEILING
+	; if(.CEILING >= .y), don't eject
+	bnc .testWater
+	; eject
+	li .CEILING
+	lr .y, a
+	
+.testWater:
+	;  if newpos is in the water, set death flag
+	; .WATER_LEVEL - (.y+.height)
+	lr a, .y
+	as .height
+	ci .WATER_LEVEL
+	; if(.WATER_LEVEL > (.y+.height)) don't eject
+	bc .exit
+	; eject
+	lr a, .height
+	com
+	inc
+	ai .WATER_LEVEL
+	lr .y, a
+
+.exit:
+	; reload IS
+	lr a, .tempIS
+	lr IS, a
+	pop
+; end bgCollision()
 ;-------------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
