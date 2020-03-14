@@ -1,4 +1,4 @@
 *.bat
 *.bin
 list.txt
-./screens/*
+screens/*

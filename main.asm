@@ -16,10 +16,11 @@
 ; TODO LIST
 ; O Write draw function
 ; O Water animation
+; O Read Inputs
 ; X Menu (Change time, stock, bridge lengths, etc)
 ; X Timer Decrement
 ; X Draw Stock (inc/dec)
-; X Delay function
+; ~ Delay function
 ; X Write main loop
 ; X Complete the game
 
@@ -92,7 +93,7 @@ optionBridge = 077 ;(LLLLRRRR)
 ; - bullets can respawn like contra's laser
 ; - speed
 
-;-------------------------------------------------------------------------------	
+;-------------------------------------------------------------------------------
 initGame:
 ; Clear BIOS stack pointer
 	setisar 073
@@ -120,8 +121,17 @@ initGame:
 
 	; Init memory
 	
-	; Menu
+;-------------------------------------------------------------------------------
+menu:
 
+menuLoop:
+
+	;Animate water
+	; pi animateWaves
+	
+	; jmp menuLoop
+
+;-------------------------------------------------------------------------------
 initMatch:
 	; Set score, position, etc.
 
@@ -475,26 +485,91 @@ water:
 ;
 ; Rough draft. Trying to figure out how to do this
 
-doPlayer:
+doPlayer: subroutine
 	lr k,p
 	
-; process player
-;  if human, check inputs
-;  if computer, produce AI inputs (how?)
-;
-;  react to inputs
-;   move left or right
-;   jump (double jump) - make sure this input is edge sensitive
-;   shooting
-;    check if bullet can be spawned
-;    check angle
-;    spawn bullet
-;  undraw/draw player
-;  if fallen in water, set P1 lose flag
+; -- Read and process inputs ----------
+.xTemp = 0
+.yTemp = 1
+.curInput = 2
+.edgeInput = 3
 
+; if human, check inputs for the appropriate player
+	lr a,is
+	ni 070
+	ci 020
+	bnz .p2inputs
+	pi readRightHand
+	br .processInputs
+.p2inputs:
+	pi readLeftHand
 
-	; Collision detection
-	;  if newpos is inside the bridge, eject up
+.processInputs:
+	;  Handle edge sensitivity and stuff
+	; .cur = A (controller)
+	lr .curInput, a
+	; .edge = .temp XOR .prev
+	setisarl p1.prev
+	xs (is)
+	lr .edgeInput, a
+	; .prev = .cur
+	lr a, .curInput
+	lr (is), a
+	
+	; TODO LATER: if computer, produce AI inputs (how?)
+	
+; get temp position
+	setisarl p1.xpos
+	lr a, (is)+
+	lr .xTemp, a
+	lr a, (is)
+	lr .yTemp, a
+
+; Free Movement (TEMPORARY)
+	li HAND_LEFT
+	ns .curInput
+	bz .checkRightInput
+	lr a, .xTemp
+	ai <[-2]
+	lr .xTemp, a
+.checkRightInput:
+	li HAND_RIGHT
+	ns .curInput
+	bz .checkUpInput
+	lr a, .xTemp
+	ai 2
+	lr .xTemp, a	
+.checkUpInput:
+	li HAND_UP
+	ns .curInput
+	bz .checkDownInput
+	lr a, .yTemp
+	ai <[-2]
+	lr .yTemp, a
+.checkDownInput:
+	li HAND_DOWN
+	ns .curInput
+	bz .endCheckInput
+	lr a, .yTemp
+	ai 2
+	lr .yTemp, a
+.endCheckInput:
+	
+	; move x
+	;  if .cur & HAND_LEFT
+	;   xvel -= X_ACCEL (make sure not to overflow)
+	;  if .cur & HAND_RIGHT
+	;   xvel += X_ACCEL
+	; .xtemp = xpos + xvel
+	
+	; move y ; maybe have a double jump
+	;  if .edge & HAND_G_UP (maybe?)
+	;   yvel = JUMP_Y_VEL
+	;  yvel -= Y_GRAVITY
+	; .ytemp = ypos + yvel
+	
+	; Collision detection (ejection)
+	;  if newpos is inside the bridge, eject up and clear yvel
 	;  if newpos is under the left bridge, eject left
 	;  if newpos is under the right bridge, eject right
 	;  if newpos is on the other side of the court
@@ -503,20 +578,35 @@ doPlayer:
 	;  if newpos is left of the left goal, eject left
 	;  if newpos is right of the right goal, eject right
 	;  if newpos is in the water, let checkDeath handle it
+	;
+	; ^-- perhaps put that stuff in its own function with x,y,w,h args and
+	;  returns for x,y,and water collisions (so it can be reused for bullets)
+	
+	; adjust angle
+	;  if .cur & HAND_CCW
+	;   angle--
+	;  if .cur & HAND_CW
+	;   angle++
+	
+	; spawn bullet
+	;  if .edge & HAND_G_DOWN
+	;   spawn bullet based on angle (if possible)
 	
 ; Undraw from oldpos
+	; Set color
 	li BKG_A
 	lr blit.color,a 
 	
+	; Get old position
 	setisarl p1.xpos
 	lr a, (is)+
 	sr 1
 	lr blit.x, a
-	
 	lr a, (is)
 	sr 1
 	lr blit.y, a
 	
+	; Get old character??? (or just clear of block?)
 	setisarl p1.char
 	lr a, (is)
 	;ni $0F
@@ -524,22 +614,36 @@ doPlayer:
 	
 	pi blitNum
 	
-; Apply velocity	
+; Set newpos
+	setisarl p1.xpos
+	lr a, .xTemp
+	lr (is)+, a
+	lr a, .yTemp
+	lr (is), a
 	
 ; Redraw at newpos
-	; Get new position
+	; Set color
+	lr a,is
+	ni 070
+	ci 020
+	bnz .p2color
 	li RED_A
+	br .setColor
+.p2color:
+	li BLUE_A
+.setColor:
 	lr blit.color,a 
 	
+	; Get new position
 	setisarl p1.xpos
 	lr a, (is)+
 	sr 1
 	lr blit.x, a
-	
 	lr a, (is)
 	sr 1
 	lr blit.y, a
 	
+	; Get character
 	setisarl p1.char
 	lr a, (is)
 	;ni $0F
@@ -552,6 +656,42 @@ doPlayer:
 ; end doPlayer()
 ;-------------------------------------------------------------------------------
 
+;-------------------------------------------------------------------------------
+; readLeftHand()
+;  reads the left hand-controller
+readLeftHand: subroutine
+	clr
+	outs 0
+	outs 4
+	ins 4
+	com
+	pop
+;
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+; readRightHand()
+readRightHand: subroutine
+	clr
+	outs 0
+	outs 1
+	ins 1
+	com
+	pop
+;
+;-------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
+; readConsole()
+readConsole:
+	clr
+	outs 0
+	ins 0
+	com
+	pop
+;
+;-------------------------------------------------------------------------------
+	
 ;-------------------------------------------------------------------------------
 ;redraw
 	; object processing functions should return new x, new y, and new char
@@ -677,7 +817,7 @@ animateWaves: subroutine
 	; reload timer
 	setisar waveTimer
 	lr a, (IS)
-	sl 1
+	sr 1
 	lr .tempX, a
 
 .loop2:
