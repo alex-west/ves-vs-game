@@ -1,22 +1,22 @@
 
-SMILE:
-	db %01010010
-	db %10000001
-	db %00010111
-	db 0
-
-; color,x,y,w,h,dc
-	
-SMILE_A:
-	db GREEN_A|CLEAR_BG
-;	db %00110100
-	db 10,10,5,5
-	dw SMILE
-	
-SMILE_B:
-	db %01000001
-	db 20,18,5,5
-	dw SMILE	
+;SMILE:
+;	db %01010010
+;	db %10000001
+;	db %00010111
+;	db 0
+;
+;; color,x,y,w,h,dc
+;	
+;SMILE_A:
+;	db GREEN_A|CLEAR_BG
+;;	db %00110100
+;	db 10,10,5,5
+;	dw SMILE
+;	
+;SMILE_B:
+;	db %01000001
+;	db 20,18,5,5
+;	dw SMILE	
 	
 ; Fill patterns
 SOLID: db %11111111
@@ -61,49 +61,49 @@ CHR_BRIDGE_R = $11
 	db %11101101, %10000000 ; $12 - Right bridge
 	
 	
-FLAG_BG:
-	db BKG_A | FILL
-	db 0,0
-	db 27, $40
-	dw SOLID
-FLAG_B:
-	db BLUE_A | FILL
-	db 27,0
-	db 27, $40
-	dw SOLID
-FLAG_R:
-	db RED_A | FILL
-	db 27*2,0
-	db 27, $40
-	dw SOLID
-FLAG_G:
-	db GREEN_A | FILL
-	db 27*3,0
-	db 27, $40
-	dw SOLID
-
-FLAG_ATTR_GRAY:
-	db BG_GRAY
-	db $7d, 0
-	db 2,16
-	dw CHECKER
-
-FLAG_ATTR_BLUE:
-	db BG_BLUE
-	db $7d, 16
-	db 2,16
-	dw CHECKER
-	
-FLAG_ATTR_GREEN:
-	db BG_GREEN
-	db $7d, 32
-	db 2,16
-	dw CHECKER
-	
-FLAG_ATTR_BW:
-	db BG_MONO
-	db $7d, 48
-	db 2,16
-	dw CHECKER
+;FLAG_BG:
+;	db BKG_A | FILL
+;	db 0,0
+;	db 27, $40
+;	dw SOLID
+;FLAG_B:
+;	db BLUE_A | FILL
+;	db 27,0
+;	db 27, $40
+;	dw SOLID
+;FLAG_R:
+;	db RED_A | FILL
+;	db 27*2,0
+;	db 27, $40
+;	dw SOLID
+;FLAG_G:
+;	db GREEN_A | FILL
+;	db 27*3,0
+;	db 27, $40
+;	dw SOLID
+;
+;FLAG_ATTR_GRAY:
+;	db BG_GRAY
+;	db $7d, 0
+;	db 2,16
+;	dw CHECKER
+;
+;FLAG_ATTR_BLUE:
+;	db BG_BLUE
+;	db $7d, 16
+;	db 2,16
+;	dw CHECKER
+;	
+;FLAG_ATTR_GREEN:
+;	db BG_GREEN
+;	db $7d, 32
+;	db 2,16
+;	dw CHECKER
+;	
+;FLAG_ATTR_BW:
+;	db BG_MONO
+;	db $7d, 48
+;	db 2,16
+;	dw CHECKER
 
 ; EoF

@@ -9,6 +9,7 @@
 ; Milestones
 ; - Project Started: 				2019-08-16
 ; - Project Started in Earnest:		2020-03-01
+; - Playfield Collision Working:	2020-03-14
 ; - First Playable Build: ???
 ; - First Release Candidate: ???
 ; - Released: ???
@@ -17,6 +18,8 @@
 ; O Write draw function
 ; O Water animation
 ; O Read Inputs
+; ~ Playfield collision
+; X Player physics
 ; X Menu (Change time, stock, bridge lengths, etc)
 ; X Timer Decrement
 ; X Draw Stock (inc/dec)
@@ -49,7 +52,7 @@ cartEntry:
 
 ; Playfield bounds
 X_CENTER = 54
-LEFT_WALL = 7
+LEFT_WALL = 6
 RIGHT_WALL = X_CENTER*2-LEFT_WALL-1
 CEILING = 13
 BRIDGE_Y = 46
@@ -62,7 +65,8 @@ p1.ypos = 021 ; Q 7.1
 p1.xvel = 022 ; Q 3.5 (SR 4 and sign extend before adding to position)
 p1.yvel = 023 ; Q 3.5
 p1.char = 024 ; 
-p1.stoc = 025
+p1.stat = 025 ; use this for some flags
+GROUND_FLAG = %00010000
 p1.brig = 026 ; Q 7.1
 p1.prev = 027
 
@@ -72,7 +76,7 @@ p2.ypos = 031 ; Q 7.1
 p2.xvel = 032 ; Q 3.5 (SR 4 and sign extend before adding to position)
 p2.yvel = 033 ; Q 3.5
 p2.char = 034 ; 
-p2.stoc = 035
+p2.stat = 035
 p2.brig = 036 ; Q 7.1
 p2.prev = 037
 
@@ -92,6 +96,10 @@ optionBridge = 077 ;(LLLLRRRR)
 ; - cross center or not
 ; - bullets can respawn like contra's laser
 ; - speed
+; - VVVVVV jumps
+; - tug o war with bridge
+; - bouncy water (lava?)
+; - big bullets
 
 ;-------------------------------------------------------------------------------
 initGame:
@@ -149,7 +157,7 @@ initMatch:
 	
 	; TODO have this be selectable in the menu
 	setisar optionBridge
-	li (13 << 4) | (11)
+	li (12 << 4) | (12)
 	lr (is), a
 	
 	; TODO have initial time be selectable in the menu
@@ -182,16 +190,6 @@ mainLoop:
 	; process left player
 	setisaru p1.xpos
 	pi doPlayer
-	;  if human, check inputs
-	;  if computer, produce AI inputs (how?)
-	;  react to inputs
-	;   move left or right
-	;   jump (double jump) - make sure this input is edge sensitive
-	;   shooting
-	;    check if bullet can be spawned
-	;    check angle
-	;    spawn bullet
-	;  draw player
 	;  if fallen in water, set P1 lose flag
 	
 	; process right player	
@@ -337,7 +335,7 @@ drawRightBridge: subroutine
 	lr blit.x,a
 	
 	; set tempPx (Q 7.1)
-	li X_CENTER*2 + 2
+	li X_CENTER*2 + 4
 	lr .tempPx, a
 	
 .loop:
@@ -433,7 +431,7 @@ drawTimer: subroutine
 
 ; Lists of objects to draw
 playfield_list_len = 9
-playfield_list:
+playfield_list: ; Rendered in reverse order
 	dw playfield_attr
 	dw colon
 	dw score_left
@@ -545,29 +543,32 @@ doPlayer: subroutine
 	lr a, .curInput
 	lr (is), a
 	
-	; TODO LATER: if computer, produce AI inputs (how?)
-	
+; TODO LATER: if computer, produce AI inputs (how?)
+
 ; get temp position
 	setisarl p1.xpos
 	lr a, (is)+
 	lr .xTemp, a
 	lr a, (is)
 	lr .yTemp, a
+	
+	;br .checkUpInput
+	br .endTempInput
 
 ; Free Movement (TEMPORARY)
-	li HAND_LEFT
-	ns .curInput
-	bz .checkRightInput
-	lr a, .xTemp
-	ai <[-2]
-	lr .xTemp, a
-.checkRightInput:
-	li HAND_RIGHT
-	ns .curInput
-	bz .checkUpInput
-	lr a, .xTemp
-	ai 2
-	lr .xTemp, a	
+;	li HAND_LEFT
+;	ns .curInput
+;	bz .checkRightInput
+;	lr a, .xTemp
+;	ai <[-2]
+;	lr .xTemp, a
+;.checkRightInput:
+;	li HAND_RIGHT
+;	ns .curInput
+;	bz .checkUpInput
+;	lr a, .xTemp
+;	ai 2
+;	lr .xTemp, a	
 .checkUpInput:
 	li HAND_UP
 	ns .curInput
@@ -578,24 +579,124 @@ doPlayer: subroutine
 .checkDownInput:
 	li HAND_DOWN
 	ns .curInput
-	bz .endCheckInput
+	bz .endTempInput
 	lr a, .yTemp
 	ai 2
 	lr .yTemp, a
-.endCheckInput:
+.endTempInput:
 	
-	; move x
-	;  if .cur & HAND_LEFT
-	;   xvel -= X_ACCEL (make sure not to overflow)
+; Handle x movement
+X_ACCEL = $04
+X_MAX = $30
+
+	setisarl p1.xvel
+	; if .curInput & HAND_LEFT
+	lr a, .curInput
+	ni HAND_LEFT
+	bz .accelRight
+	; xvel -= X_ACCEL (make sure not to overflow)
+	li <[-X_ACCEL]
+	; make sure we don't overflow
+	as (is)
+	bp .applyAccelLeft
+	ci <[-X_MAX]
+	bm .applyAccelLeft
+	li <[-X_MAX]
+.applyAccelLeft:
+	lr (is), a
+
+.accelRight:
 	;  if .cur & HAND_RIGHT
+	lr a, .curInput
+	ni HAND_RIGHT
+	bz .applyDrag
 	;   xvel += X_ACCEL
-	; .xtemp = xpos + xvel
+	li X_ACCEL
+	; make sure we don't overflow
+	as (is)
+	bm .applyAccelRight
+	ci <[X_MAX]
+	bp .applyAccelRight
+	li <[X_MAX]
+.applyAccelRight:
+	lr (is), a
+	br .applyVel
 	
-	; move y ; maybe have a double jump
+; apply drag to vel
+.DRAG = 2
+.applyDrag: ;
+	lr a, (is)
+	;ai 0
+	ci 8
+	bz .applyVel
+	bm .antiRightDrag
+	ai .DRAG
+	lr (is), a
+	br .applyVel
+.antiRightDrag:
+	ai <[-.DRAG]
+	lr (is), a
+
+	; .xtemp = xpos + xvel
+.applyVel
+	lr a, (is)
+	ai 0
+	bp .noSignExt
+	sr 4
+	oi $F0
+	br .applyVelB
+.noSignExt:
+	sr 4
+.applyVelB
+	as .xTemp
+	lr .xTemp, a
+	
+; move y
+JUMP_Y_VEL = <[-$60]
+GRAVITY = $04
+Y_DOWN_MAX = $70
+	; TODO: maybe have a double jump
 	;  if .edge & HAND_G_UP (maybe?)
+	lr a, .curInput
+	ni HAND_UP
+	bz .applyGravity
+	; if on ground
+	setisarl p1.stat
+	lr a, (is)
+	ni GROUND_FLAG
+	bz .applyGravity
+	; Initiate jump	
 	;   yvel = JUMP_Y_VEL
-	;  yvel -= Y_GRAVITY
+	setisarl p1.yvel
+	li JUMP_Y_VEL
+	lr (is), a
+.applyGravity:
+	setisarl p1.yvel
+	;  yvel += Y_GRAVITY
+	li GRAVITY
+	; make sure we don't overflow
+	as (is)
+	bm .applyGravity2
+	ci <[Y_DOWN_MAX]
+	bp .applyGravity2
+	li <[Y_DOWN_MAX]
+.applyGravity2:
+	lr (is), a
+	;br .applyVel
+	
 	; .ytemp = ypos + yvel
+.applyYVel:
+	lr a, (is)
+	ai 0
+	bp .noYSignExt
+	sr 4
+	oi $F0
+	br .applyYVel2
+.noYSignExt:
+	sr 4
+.applyYVel2:
+	as .yTemp
+	lr .yTemp, a
 	
 	; Collision detection (ejection)
 	lis 6
@@ -603,7 +704,35 @@ doPlayer: subroutine
 	li 10
 	lr collision.height, a
 	pi collision	
-	; TODO: Use collision's return flags to set velocity and handle death
+	; TODO: Use collision's return flags to set velocity, handle death, and set
+	;  the player's ground flag
+; zero xvel if xbonk is set 
+	lr a, collision.flags
+	ni XBONK_FLAG
+	bz .testYbonk
+	setisarl p1.xvel
+	clr
+	lr (is), a
+.testYbonk:
+	; zero yvel if ybonk is set 
+	setisarl p1.stat
+	lr a, (is)
+	ni <[~GROUND_FLAG]
+	lr (is), a
+	lr a, collision.flags
+	ni YBONK_FLAG
+	bz .testWater
+	; Set ground flag if appropriate
+	lr a, (is)
+	oi GROUND_FLAG
+	lr (is), a
+	; Clear velocity ; TODO: Fix glitch that allows you to hold to the ceiling
+	setisarl p1.yvel
+	clr
+	lr (is), a
+.testWater:
+	
+	; pray for death if water is set (TODO)
 	
 	; adjust angle
 	;  if .cur & HAND_CCW
@@ -701,6 +830,10 @@ collision.height = 5
 
 ; Returns
 collision.flags = 6
+.flags = collision.flags
+WATER_FLAG = %100
+YBONK_FLAG = %010
+XBONK_FLAG = %001
 
 ; Temps
 .tempIS = 7
@@ -726,14 +859,17 @@ collision.flags = 6
 	setisaru p2.brig
 	lr a, (is)
 	lr .tempRBridge, a
+	; Clear return value
+	clr
+	lr .flags, a
 
 	; Collision detection (ejection)
 ; Bridge collision
 	;  if newpos is inside the bridge, eject up set ybonk flag
 	;  if newpos is under the left bridge, eject left and set xbonk flag
 	;  if newpos is under the right bridge, eject right and set xbonk flag
-	
 	;  if newpos is in the water, set death flag
+	
 	; .BRIDGE_Y - (.y+.height)
 	lr a, .y
 	as .height
@@ -743,10 +879,8 @@ collision.flags = 6
 	; if this is true we should be in vertical range of the bridge
 	ci .BRIDGE_Y+6
 	bc .testBridge
-	; else, we are below the bridge
 	
-	;br .testLeft ; TODO: replace with better stuff
-	
+; else, we are below the bridge (but not necessarily underneath)
 	; .tempLBridge - (.x+.width)
 	lr a, .x
 	as .width
@@ -763,8 +897,13 @@ collision.flags = 6
 	as .tempRBridge
 	; if(.tempRBridge >= .x), don't eject
 	bnc .testLeft
+	bz .testLeft
 	
-	; We are underneath the bridge
+; We are underneath the bridge, so eject one way or another
+	; set xbonk flag
+	lr a, .flags
+	oi XBONK_FLAG
+	lr .flags, a
 	
 	; .X_CENTER - .x
 	lr a, .x
@@ -782,12 +921,12 @@ collision.flags = 6
 	
 .ejectL:
 	lr a, .tempRBridge
-	inc
-	inc
+	;inc
+	;inc
 	lr .x, a
 	br .testLeft
 	
-; test if we are in the bridge on the x axis
+; test if we are within the bridge on the x axis
 .testBridge:
 	
 	; .tempLBridge - (.x+.width)
@@ -807,15 +946,20 @@ collision.flags = 6
 	; if(.tempRBridge >= .x), don't eject
 	bnc .testLeft
 
-	; We should be inside the bridge, so eject up and set ybonk and ground flags
+; We are inside the bridge, so eject up and set ybonk flag
 	lr a, .height
 	com
 	inc
 	ai .BRIDGE_Y
 	lr .y, a
+	; set ybonk flag
+	lr a, .flags
+	oi YBONK_FLAG
+	lr .flags, a
 	
 ; Bounds collision	
 	
+	; TODO: 
 	;  if newpos is on the other side of the court
 	;   and if the mode does not permit crossing that line, eject back into court
 
@@ -826,9 +970,14 @@ collision.flags = 6
 	ci .LEFT_WALL
 	; if(.LEFT_WALL >= .x), don't eject
 	bnc .testRight
+	bz .testRight
 	; eject
 	li .LEFT_WALL
 	lr .x, a
+	; set xbonk flag
+	lr a, .flags
+	oi XBONK_FLAG
+	lr .flags, a
 	
 	;  if newpos is right of the right goal, clamp to right goal, set xbonk flag
 .testRight:
@@ -844,6 +993,10 @@ collision.flags = 6
 	inc
 	ai .RIGHT_WALL
 	lr .x, a
+	; set xbonk flag
+	lr a, .flags
+	oi XBONK_FLAG
+	lr .flags, a
 	
 	;  if newpos in above the ceiling, clamp to ceiling, set ybonk flag
 .testCeiling:
@@ -853,8 +1006,12 @@ collision.flags = 6
 	; if(.CEILING >= .y), don't eject
 	bnc .testWater
 	; eject
-	li .CEILING
+	li .CEILING+1 ; HOTFIX
 	lr .y, a
+	; set ybonk flag
+	lr a, .flags
+	oi YBONK_FLAG
+	lr .flags, a
 	
 .testWater:
 	;  if newpos is in the water, set death flag
@@ -870,6 +1027,10 @@ collision.flags = 6
 	inc
 	ai .WATER_LEVEL
 	lr .y, a
+	; set water (death) flag
+	lr a, .flags
+	oi WATER_FLAG
+	lr .flags, a
 
 .exit:
 	; reload IS
@@ -1109,9 +1270,10 @@ animateWaves: subroutine
 	pop
 ; end of animateWaves()
 ;-------------------------------------------------------------------------------
+endOfData:
 
-	org cartStart + cartSize - 24
-	
+	org cartStart + cartSize - 26
 	dc "Copyright 2020 Alex West", 0
+	dw endOfData
 	
 ; EoF
