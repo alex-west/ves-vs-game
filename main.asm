@@ -552,39 +552,6 @@ doPlayer: subroutine
 	lr a, (is)
 	lr .yTemp, a
 	
-	;br .checkUpInput
-	br .endTempInput
-
-; Free Movement (TEMPORARY)
-;	li HAND_LEFT
-;	ns .curInput
-;	bz .checkRightInput
-;	lr a, .xTemp
-;	ai <[-2]
-;	lr .xTemp, a
-;.checkRightInput:
-;	li HAND_RIGHT
-;	ns .curInput
-;	bz .checkUpInput
-;	lr a, .xTemp
-;	ai 2
-;	lr .xTemp, a	
-.checkUpInput:
-	li HAND_UP
-	ns .curInput
-	bz .checkDownInput
-	lr a, .yTemp
-	ai <[-2]
-	lr .yTemp, a
-.checkDownInput:
-	li HAND_DOWN
-	ns .curInput
-	bz .endTempInput
-	lr a, .yTemp
-	ai 2
-	lr .yTemp, a
-.endTempInput:
-	
 ; Handle x movement
 X_ACCEL = $04
 X_MAX = $30
