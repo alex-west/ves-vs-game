@@ -38,6 +38,7 @@ header:
 	db $55,"J"
 cartEntry:
 	jmp initGame
+    
 ;-------------------------------------------------------------------------------
 ; Includes
 
@@ -48,7 +49,7 @@ cartEntry:
 	include "pics.asm"
 
 ;-------------------------------------------------------------------------------
-; Global register and constant definitions
+; Global register and constant definitions {
 
 ; Playfield bounds
 X_CENTER = 54
@@ -101,8 +102,10 @@ optionBridge = 077 ;(LLLLRRRR)
 ; - bouncy water (lava?)
 ; - big bullets
 
+; } ----------------------------------------------------------------------------
+
 ;-------------------------------------------------------------------------------
-initGame:
+initGame: ; {
 ; Clear BIOS stack pointer
 	setisar 073
 	clr
@@ -128,19 +131,17 @@ initGame:
 	pi blitAttribute
 
 	; Init memory
-	
-;-------------------------------------------------------------------------------
-menu:
 
+; }	----------------------------------------------------------------------------
+menu:; {
 menuLoop:
 
 	;Animate water
 	; pi animateWaves
 	
 	; jmp menuLoop
-
-;-------------------------------------------------------------------------------
-initMatch:
+; } ----------------------------------------------------------------------------
+initMatch: ; {
 	; Set score, position, etc.
 
 	; TODO: Replace
@@ -175,9 +176,8 @@ initMatch:
 	
 	pi drawTimer
 	
-	
-	; Main loop
-mainLoop:
+; } ----------------------------------------------------------------------------
+mainLoop: ; {
 	
 	; process bullets
 	;  check if bullet exists
@@ -220,11 +220,10 @@ mainLoop:
 	pi delay
 	
 	jmp mainLoop
-; end mainLoop()
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; drawPlayfield(void)
+; drawPlayfield(void) {
 ;
 ; This function could be genericized by having .tempCount be an argument and
 ;  by storing playfield list in H as an arg as well
@@ -255,11 +254,10 @@ drawPlayfield: subroutine
 	
 	lr p,k
 	pop
-; end of drawPlayfield()
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 	
 ;-------------------------------------------------------------------------------	
-; Draw left bridge
+; Draw left bridge {
 
 drawLeftBridge: subroutine
 	lr k,p
@@ -311,10 +309,10 @@ drawLeftBridge: subroutine
 	
 	lr p,k
 	pop
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; Draw right bridge
+; Draw right bridge {
 
 drawRightBridge: subroutine
 	lr k,p
@@ -365,11 +363,10 @@ drawRightBridge: subroutine
 	
 	lr p,k
 	pop
-; end of drawPlayfield()
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; drawTimer()
+; drawTimer() {
 
 drawTimer: subroutine
 	lr k,p
@@ -423,11 +420,11 @@ drawTimer: subroutine
 	
 	lr p,k
 	pop
-; end of drawTimer()
-;-------------------------------------------------------------------------------
+
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; data for drawPlayfield()
+; data for drawPlayfield() {
 
 ; Lists of objects to draw
 playfield_list_len = 9
@@ -504,11 +501,10 @@ water:
 	db 0,WATER_LEVEL
 	db $7c,8
 	dw SOLID
-; end of data for drawPlayfield()
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; doPlayer()
+; doPlayer() {
 ;
 ; Rough draft. Trying to figure out how to do this
 
@@ -619,7 +615,7 @@ X_MAX = $30
 	lr .xTemp, a
 	
 ; move y
-JUMP_Y_VEL = <[-$60]
+JUMP_Y_VEL = <[-$50]
 GRAVITY = $04
 Y_DOWN_MAX = $70
 	; TODO: maybe have a double jump
@@ -664,13 +660,13 @@ Y_DOWN_MAX = $70
 .applyYVel2:
 	as .yTemp
 	lr .yTemp, a
-	
+
 	; Collision detection (ejection)
 	lis 6
 	lr collision.width, a
 	li 10
 	lr collision.height, a
-	pi collision	
+	pi collision
 	; TODO: Use collision's return flags to set velocity, handle death, and set
 	;  the player's ground flag
 ; zero xvel if xbonk is set 
@@ -687,7 +683,7 @@ Y_DOWN_MAX = $70
 	ni <[~GROUND_FLAG]
 	lr (is), a
 	lr a, collision.flags
-	ni YBONK_FLAG
+	ni YBONK_FLAG ; or with CEILING_FLAG ?
 	bz .testWater
 	; Set ground flag if appropriate
 	lr a, (is)
@@ -711,7 +707,7 @@ Y_DOWN_MAX = $70
 	;  if .edge & HAND_G_DOWN
 	;   spawn bullet based on angle (if possible)
 	
-; Undraw from oldpos
+; Undraw from oldpos {
 	; Set color
 	li BKG_A
 	lr blit.color,a 
@@ -732,6 +728,7 @@ Y_DOWN_MAX = $70
 	lr blit.char, a
 	
 	pi blitNum
+; }
 	
 ; Set newpos
 	setisarl p1.xpos
@@ -740,7 +737,7 @@ Y_DOWN_MAX = $70
 	lr a, .yTemp
 	lr (is), a
 	
-; Redraw at newpos
+; Redraw at newpos {
 	; Set color
 	lr a,is
 	ni 070
@@ -769,14 +766,14 @@ Y_DOWN_MAX = $70
 	lr blit.char, a
 	
 	pi blitNum
+ ; }
 	
 	lr p,k
-	pop
-; end doPlayer()
-;-------------------------------------------------------------------------------
+	pop 
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; collision()
+; collision() {
 ;  Given x and y positions (in r0 and r1) and width and height (in r4 and r5)
 ;   ejects the player back into the playfield.
 ;
@@ -798,9 +795,10 @@ collision.height = 5
 ; Returns
 collision.flags = 6
 .flags = collision.flags
-WATER_FLAG = %100
-YBONK_FLAG = %010
-XBONK_FLAG = %001
+CEILING_FLAG = %1000
+WATER_FLAG   = %0100
+YBONK_FLAG   = %0010
+XBONK_FLAG   = %0001
 
 ; Temps
 .tempIS = 7
@@ -972,12 +970,13 @@ XBONK_FLAG = %001
 	ci .CEILING
 	; if(.CEILING >= .y), don't eject
 	bnc .testWater
+	bz .testWater
 	; eject
-	li .CEILING+1 ; HOTFIX
+	li .CEILING
 	lr .y, a
 	; set ybonk flag
 	lr a, .flags
-	oi YBONK_FLAG
+	oi CEILING_FLAG ; TODO: change this to ceiling flag
 	lr .flags, a
 	
 .testWater:
@@ -1004,11 +1003,10 @@ XBONK_FLAG = %001
 	lr a, .tempIS
 	lr IS, a
 	pop
-; end bgCollision()
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; readLeftHand()
+; readLeftHand() {
 ;  reads the left hand-controller
 readLeftHand: subroutine
 	clr
@@ -1017,11 +1015,10 @@ readLeftHand: subroutine
 	ins 4
 	com
 	pop
-;
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; readRightHand()
+; readRightHand() {
 readRightHand: subroutine
 	clr
 	outs 0
@@ -1029,31 +1026,30 @@ readRightHand: subroutine
 	ins 1
 	com
 	pop
-;
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; readConsole()
+; readConsole() {
 readConsole:
 	clr
 	outs 0
 	ins 0
 	com
 	pop
-;
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 	
 ;-------------------------------------------------------------------------------
-;redraw
+;redraw notes {
 	; object processing functions should return new x, new y, and new char
 	; a redraw flag should be bitpacked in there imo
 	; undraw using old x, old y, and old char
 	; check if redraw flag is set
 	; redraw at new x, new y, new char
 	; old x,y,char get assigned new x,y,char
+; }
 
 ;-------------------------------------------------------------------------------
-; delay loop
+; delay loop {
 	; delay_time = time_const - CPU_counter
 	; make sure we don't underflow
 	; delay
@@ -1076,11 +1072,10 @@ delay: subroutine
 	bnz .loop
 	
 	pop
-; end of delay()
-;-------------------------------------------------------------------------------
+; } ----------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
-; animateWaves()
+; animateWaves() {
 ;
 ; animates some nices waves
 ;
@@ -1235,10 +1230,9 @@ animateWaves: subroutine
 	
 	lr p,k
 	pop
-; end of animateWaves()
-;-------------------------------------------------------------------------------
-endOfData:
+; } ----------------------------------------------------------------------------
 
+endOfData:
 	org cartStart + cartSize - 26
 	dc "Copyright 2020 Alex West", 0
 	dw endOfData

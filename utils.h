@@ -121,7 +121,7 @@ ifNotOZCS = $F ; same as t=B
 	com
 	inc
 	ENDM
-	
+
 ;-------------------------------------------------------------------------------
 ; The following required for back-compatibility with code which does not use
 ; segments.
